@@ -331,14 +331,23 @@ public class ConcurrentLinkedQueue<E> extends AbstractQueue<E>
             Node<E> q = p.next;
             if (q == null) {
                 // p is last node
+                /*
+                * p.casNext(null, newNode)
+                * 将p的next节点赋值为newNode，也就是将新的元素加入到队列中。
+                * */
                 if (p.casNext(null, newNode)) {
                     // Successful CAS is the linearization point
                     // for e to become an element of this queue,
                     // and for newNode to become "live".
                     if (p != t) // hop two nodes at a time
+                        /*
+                        * 更新下tail，只有在偶数个节点时候，才会进行更新t的指向。
+                        * 有点类似C语言的指针。
+                        * */
                         casTail(t, newNode);  // Failure is OK.
                     return true;
                 }
+                /*CAS竞争失败，再次尝试*/
                 // Lost CAS race to another thread; re-read next
             }
             else if (p == q)
@@ -346,14 +355,31 @@ public class ConcurrentLinkedQueue<E> extends AbstractQueue<E>
                 // will also be off-list, in which case we need to
                 // jump to head, from which all live nodes are always
                 // reachable.  Else the new tail is a better bet.
+                /*
+                 * 遇到哨兵节点，从head开始遍历
+                 * 但如果tail被修改，则使用tail（因为可能被修改正确了）
+                 *
+                 * 首先 != 并不是原子操作，它是可以被中断的。也就是说，在执行!=时，
+                 * 程序会先取得t的值，在执行t=tail，并取得新的t的值，然后再比较这两个值是否相等
+                 * 在单线程中，t!=t这种语句显然不会成立，但是在并发环境中
+                 * 有可能在获得左边的t值后，右边的t值被其他线程修改了
+                 * 这样，t!=t就可能成立。
+                 * */
                 p = (t != (t = tail)) ? t : head;
             else
+                /*
+                * 取下一个节点或者最后一个节点
+                * */
                 // Check for tail updates after two hops.
                 p = (p != t && t != (t = tail)) ? t : q;
         }
     }
 
     public E poll() {
+        /*
+        * 这个 restartFromHead 是跳出外循环的标记，下面有两个for循环，从内层for直接跳出外层for
+        * 参考：https://www.cnblogs.com/ismileboy/p/7246699.html
+        * */
         restartFromHead:
         for (;;) {
             for (Node<E> h = head, p = h, q;;) {
