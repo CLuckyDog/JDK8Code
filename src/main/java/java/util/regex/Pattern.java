@@ -1076,7 +1076,8 @@ public final class Pattern
     }
 
     /**
-     * Creates a matcher that will match the given input against this pattern.
+     * creates a matcher that will match the given input against this pattern.
+     * 创建一个匹配器，它将与此模式匹配给定的输入
      *
      * @param  input
      *         The character sequence to be matched

@@ -334,9 +334,9 @@ public class LinkedBlockingQueue<E> extends AbstractQueue<E>
         // holding count negative to indicate failure unless set.
         int c = -1;
         Node<E> node = new Node<E>(e);
-        final ReentrantLock putLock = this.putLock;
+        final ReentrantLock putLock = this.putLock;/*获取重入锁，*/
         final AtomicInteger count = this.count;
-        putLock.lockInterruptibly();
+        putLock.lockInterruptibly();/*申请锁，该方式在等待锁的过程中，可以响应中断*/
         try {
             /*
              * Note that count is used in wait guard even though it is
@@ -346,18 +346,18 @@ public class LinkedBlockingQueue<E> extends AbstractQueue<E>
              * signalled if it ever changes from capacity. Similarly
              * for all other uses of count in other wait guards.
              */
-            while (count.get() == capacity) {
-                notFull.await();
+            while (count.get() == capacity) {/*如果队列已满*/
+                notFull.await();/*等待*/
             }
-            enqueue(node);
-            c = count.getAndIncrement();
+            enqueue(node);/*插入数据*/
+            c = count.getAndIncrement();/*更新总数，变量c是count加1前的值*/
             if (c + 1 < capacity)
-                notFull.signal();
+                notFull.signal();/*有足够的空间，通知其他线程*/
         } finally {
-            putLock.unlock();
+            putLock.unlock();/*释放锁*/
         }
         if (c == 0)
-            signalNotEmpty();
+            signalNotEmpty();/*插入成功后，通知take()操作取数据*/
     }
 
     /**
@@ -435,21 +435,21 @@ public class LinkedBlockingQueue<E> extends AbstractQueue<E>
         E x;
         int c = -1;
         final AtomicInteger count = this.count;
-        final ReentrantLock takeLock = this.takeLock;
-        takeLock.lockInterruptibly();
+        final ReentrantLock takeLock = this.takeLock;/*获取重入锁*/
+        takeLock.lockInterruptibly();/*在这里加锁，保证只能单线程进入，该方式在等待锁的过程中，可以响应中断*/
         try {
-            while (count.get() == 0) {
-                notEmpty.await();
+            while (count.get() == 0) {/*如果当前没有可用数据，则一直等待*/
+                notEmpty.await();/*等待put()操作的通知*/
             }
-            x = dequeue();
-            c = count.getAndDecrement();
+            x = dequeue();/*获取队列中第一个node*/
+            c = count.getAndDecrement();/*数量减一，原子操作，因为会和put()函数同时访问count，注意，变量c是count减一前的值*/
             if (c > 1)
-                notEmpty.signal();
+                notEmpty.signal();/*通知其他take()线程*/
         } finally {
-            takeLock.unlock();
+            takeLock.unlock();/*释放锁*/
         }
         if (c == capacity)
-            signalNotFull();
+            signalNotFull();/*通知put()操作，已有空余空间*/
         return x;
     }
 
