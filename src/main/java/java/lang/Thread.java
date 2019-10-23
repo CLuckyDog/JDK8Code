@@ -752,6 +752,7 @@ class Thread implements Runnable {
     /**
      * This method is called by the system to give a Thread
      * a chance to clean up before it actually exits.
+     * 该方法由系统回调，在线程退出前，进行资源清理
      */
     private void exit() {
         if (group != null) {

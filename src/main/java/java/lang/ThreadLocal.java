@@ -160,6 +160,9 @@ public class ThreadLocal<T> {
         Thread t = Thread.currentThread();
         ThreadLocalMap map = getMap(t);
         if (map != null) {
+            /*
+            * 通过将自己作为key取得内部的实际数据
+            * */
             ThreadLocalMap.Entry e = map.getEntry(this);
             if (e != null) {
                 @SuppressWarnings("unchecked")
@@ -197,6 +200,16 @@ public class ThreadLocal<T> {
      *        this thread-local.
      */
     public void set(T value) {
+        /*
+        * 在set时，首先获得当前线程对象，然后，通过getMap拿到线程的ThreadLocalMap
+        * 并将值设置到ThreadLocalMap中，而ThreadLocalMap可以理解为一个Map，
+        * 但是，它是定义在Thread内部的成员。
+        *
+        * 而设置到ThreadLcoal中的数据，也正是写入了threadLcoals这个Map。
+        * 其中，key为ThreadLocal当前对象，value是我们传入的值
+        * 而threadLocals本身就保存了当前自己所在线程的所有局部变量
+        * 也就是一个ThreadLocal变量的集合
+        * */
         Thread t = Thread.currentThread();
         ThreadLocalMap map = getMap(t);
         if (map != null)
