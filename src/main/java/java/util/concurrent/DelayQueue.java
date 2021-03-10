@@ -206,21 +206,22 @@ public class DelayQueue<E extends Delayed> extends AbstractQueue<E>
         lock.lockInterruptibly();
         try {
             for (;;) {
+                //获取但不移除队首元素  (1)
                 E first = q.peek();
                 if (first == null)
-                    available.await();
+                    available.await();  //(2)
                 else {
                     long delay = first.getDelay(NANOSECONDS);
-                    if (delay <= 0)
+                    if (delay <= 0)  //(3)
                         return q.poll();
                     first = null; // don't retain ref while waiting
-                    if (leader != null)
+                    if (leader != null) // (4)
                         available.await();
                     else {
                         Thread thisThread = Thread.currentThread();
-                        leader = thisThread;
+                        leader = thisThread; // (5)
                         try {
-                            available.awaitNanos(delay);
+                            available.awaitNanos(delay);// (6)
                         } finally {
                             if (leader == thisThread)
                                 leader = null;
@@ -229,9 +230,9 @@ public class DelayQueue<E extends Delayed> extends AbstractQueue<E>
                 }
             }
         } finally {
-            if (leader == null && q.peek() != null)
+            if (leader == null && q.peek() != null)// (7)
                 available.signal();
-            lock.unlock();
+            lock.unlock();// (8)
         }
     }
 
