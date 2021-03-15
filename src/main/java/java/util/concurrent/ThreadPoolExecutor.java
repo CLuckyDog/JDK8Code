@@ -984,6 +984,7 @@ public class ThreadPoolExecutor extends AbstractExecutorService {
 
                     if (rs < SHUTDOWN ||
                         (rs == SHUTDOWN && firstTask == null)) {
+                        // 如果线程已经在运行了，就无需再次运行，所以报错
                         if (t.isAlive()) // precheck that t is startable
                             throw new IllegalThreadStateException();
                         // (8 . 4 ）添加任务
