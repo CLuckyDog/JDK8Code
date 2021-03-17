@@ -937,7 +937,7 @@ public class ThreadPoolExecutor extends AbstractExecutorService {
              *          firstTask ! = null || (II)
              *          workQueue .isEmpty())  (III)
              */
-            // ( 6) 检查队列是否只在必妥时为空
+            // ( 6) 检查队列是否只在必要时为空
             if (rs >= SHUTDOWN &&
                 ! (rs == SHUTDOWN &&
                    firstTask == null &&
@@ -973,7 +973,7 @@ public class ThreadPoolExecutor extends AbstractExecutorService {
             final Thread t = w.thread;
             if (t != null) {
                 final ReentrantLock mainLock = this.mainLock;
-                // (8 . 2 ）加独占锁，为了实现workers 同步，因为可能多个线程1月用了线程池的execute 方法
+                // (8 . 2 ）加独占锁，为了实现workers 同步，因为可能多个线程调用了线程池的execute 方法
                 mainLock.lock();
                 try {
                     // Recheck while holding lock.
