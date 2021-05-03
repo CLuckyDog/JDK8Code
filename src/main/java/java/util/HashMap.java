@@ -779,50 +779,96 @@ public class HashMap<K,V> extends AbstractMap<K,V>
      * elements from each bin must either stay at same index, or move
      * with a power of two offset in the new table.
      *
+     * 为什么要扩容?
+     * 为了解决哈希冲突导致的链表太长，影响查询效率，通过扩容来缓解这个问题。
      * @return the table
      */
     final Node<K,V>[] resize() {
+        //oldTab：引用扩容前的哈希表
         Node<K,V>[] oldTab = table;
+        //oldCap：表示扩容之前的table数组的长度
         int oldCap = (oldTab == null) ? 0 : oldTab.length;
+        //oldThr：触发扩容的阈值
         int oldThr = threshold;
+        //newCap：扩容之后table数组的长度
+        //newThr：扩容之后触发下次扩容的阈值
         int newCap, newThr = 0;
+
+        /*-----------------------------------------------------------------------------------------------------------*/
+        //条件成立，说明，hashMap中的Node[] table 已经初始化过了，是一次正常的扩容
         if (oldCap > 0) {
+            //当前容量已经大于最大值，则修改扩容阈值，并返回旧的数组，不进行扩容操作
             if (oldCap >= MAXIMUM_CAPACITY) {
                 threshold = Integer.MAX_VALUE;
                 return oldTab;
             }
+            //满足条件，则把下次扩容的阈值扩大2倍，此时，新的数组大小也赋值为2*oldCap
+            //m = n << 1  等价于  m= 2*n,用位运算代替四则运算，提高性能
+            //这里我们可以看出，每次扩容都是前一次的2倍
             else if ((newCap = oldCap << 1) < MAXIMUM_CAPACITY &&
                      oldCap >= DEFAULT_INITIAL_CAPACITY)
                 newThr = oldThr << 1; // double threshold
         }
+        //oldCap == 0 的情况，则是刚初始化 Node[] table 时的操作
+        //条件成立的话，说明我们在创建HashMap自定义了initialCapacity容量大小，此时，threshold会被初始化为一个大于0的值
+        //如果传入过initialCapacity，那么在初始化table的时候，用扩容阈值作为数组长度
+        //new HashMap(initialCapacity,loadFactor);
+        //new HashMap(initialCapacity);
+        //new HashMap(map);
         else if (oldThr > 0) // initial capacity was placed in threshold
             newCap = oldThr;
+        // 一般我们调用的都是空参构造，此时的threshold不被初始化，所以，是int类型的默认值 0
+        //new HashMap();  这种方式，初始化table大小为16
         else {               // zero initial threshold signifies using defaults
             newCap = DEFAULT_INITIAL_CAPACITY;
             newThr = (int)(DEFAULT_LOAD_FACTOR * DEFAULT_INITIAL_CAPACITY);
         }
+
+        /*-----------------------------------------------------------------------------------------------------------*/
+        //创建HashMap的时候，传入了initialCapacity，并且，initialCapacity<8时，会进入这里
+        //条件成立，则计算新的扩容阈值
         if (newThr == 0) {
             float ft = (float)newCap * loadFactor;
             newThr = (newCap < MAXIMUM_CAPACITY && ft < (float)MAXIMUM_CAPACITY ?
                       (int)ft : Integer.MAX_VALUE);
         }
         threshold = newThr;
+
+        //以上代码做了两件事，计算出newCap, newThr的值
+
+        /*-----------------------------------------------------------------------------------------------------------*/
         @SuppressWarnings({"rawtypes","unchecked"})
+        //创建一个2倍大小的新table
         Node<K,V>[] newTab = (Node<K,V>[])new Node[newCap];
         table = newTab;
+        //条件成立，说明table已经初始化过了，内部有数据，所以，要进行旧数据扩容后的处理
         if (oldTab != null) {
+            //循环遍历旧table数组的每个位置上的链表（这个链表可能就1个Node）
             for (int j = 0; j < oldCap; ++j) {
+                //临时Node变量
                 Node<K,V> e;
+                //从链表的头结点或者树的根节点开始处理，其实就是数组中的node
+                //不为null，才进行处理，为null不需要处理，为null说明没有数据
                 if ((e = oldTab[j]) != null) {
                     oldTab[j] = null;
+
+                    //单个节点时，则重新计算e在新table中的位置
                     if (e.next == null)
                         newTab[e.hash & (newCap - 1)] = e;
+
+                    //如果e是红黑树类型，则进行红黑树操作
                     else if (e instanceof TreeNode)
                         ((TreeNode<K,V>)e).split(this, newTab, j, oldCap);
+
                     else { // preserve order
+                        //桶位已经形成链表
+                        //低位链表：存放在扩容之后的数组的下标位置，与当前数组的下标位置一致
                         Node<K,V> loHead = null, loTail = null;
+                        //高位链表：存放在扩容之后的数组的下标位置  为  当前数组下标位置 + 扩容之前数组的长度
                         Node<K,V> hiHead = null, hiTail = null;
+
                         Node<K,V> next;
+
                         do {
                             next = e.next;
                             if ((e.hash & oldCap) == 0) {
@@ -840,10 +886,12 @@ public class HashMap<K,V> extends AbstractMap<K,V>
                                 hiTail = e;
                             }
                         } while ((e = next) != null);
+
                         if (loTail != null) {
                             loTail.next = null;
                             newTab[j] = loHead;
                         }
+
                         if (hiTail != null) {
                             hiTail.next = null;
                             newTab[j + oldCap] = hiHead;
