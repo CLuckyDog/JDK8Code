@@ -2372,25 +2372,43 @@ public class HashMap<K,V> extends AbstractMap<K,V>
             return root;
         }
 
+        /**
+         *  这里的x已经插入到红黑树中，这个方法是来进行调整红黑树的平衡性
+         * @param root 根节点
+         * @param x 插入的新节点
+         * @return root节点，整棵树的根节点
+         */
         static <K,V> TreeNode<K,V> balanceInsertion(TreeNode<K,V> root,
                                                     TreeNode<K,V> x) {
+            //新节点默认为红色
             x.red = true;
+            /*
+                 xp:x的父节点
+                 xpp:x的祖父节点
+                 xppl:xpp节点的左孩子节点
+                 xppr:xpp节点的右孩子节点
+             */
             for (TreeNode<K,V> xp, xpp, xppl, xppr;;) {
+                //插入的第一个节点，为root节点，所以，直接设置为黑色，并return
                 if ((xp = x.parent) == null) {
                     x.red = false;
                     return x;
                 }
+                //父节点为黑色，则不需要进行调整，直接返回root（返回整棵树）
                 else if (!xp.red || (xpp = xp.parent) == null)
                     return root;
+                //x节点的红色的父节点是祖父节点的左孩子节点
                 if (xp == (xppl = xpp.left)) {
+                    //叔叔节点存在且为红色
                     if ((xppr = xpp.right) != null && xppr.red) {
                         xppr.red = false;
                         xp.red = false;
                         xpp.red = true;
+                        //x指向祖父节点，进行向root根节点方向的递归处理
                         x = xpp;
                     }
-                    else {
-                        if (x == xp.right) {
+                    else {//叔叔节点不存在  或者  存在黑色叔叔节点
+                        if (x == xp.right) {//x是右孩子，父节点为红色
                             root = rotateLeft(root, x = xp);
                             xpp = (xp = x.parent) == null ? null : xp.parent;
                         }
