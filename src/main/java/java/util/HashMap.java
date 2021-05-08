@@ -739,6 +739,7 @@ public class HashMap<K,V> extends AbstractMap<K,V>
                      */
                     if ((e = p.next) == null) {
                         p.next = newNode(hash, key, value, null);
+                        //binCount>=8的时候，进行树化，此时，链表实际上是已经有9个元素了
                         if (binCount >= TREEIFY_THRESHOLD - 1) // -1 for 1st，这里减1，是因为binCount从0开始
                             treeifyBin(tab, hash);//达到树化阈值条件，进行链表升级为红黑树
                         break;
@@ -912,7 +913,9 @@ public class HashMap<K,V> extends AbstractMap<K,V>
         if (tab == null || (n = tab.length) < MIN_TREEIFY_CAPACITY)
             resize();
         else if ((e = tab[index = (n - 1) & hash]) != null) {
+            //hd：头结点，tl：尾结点
             TreeNode<K,V> hd = null, tl = null;
+            //do-while的作用是把原有的Node链表，改造成TreeNode的双向链表
             do {
                 TreeNode<K,V> p = replacementTreeNode(e, null);
                 if (tl == null)
@@ -923,6 +926,7 @@ public class HashMap<K,V> extends AbstractMap<K,V>
                 }
                 tl = p;
             } while ((e = e.next) != null);
+            //进行树化
             if ((tab[index] = hd) != null)
                 hd.treeify(tab);
         }
@@ -1954,6 +1958,10 @@ public class HashMap<K,V> extends AbstractMap<K,V>
      * Entry for Tree bins. Extends LinkedHashMap.Entry (which in turn
      * extends Node) so can be used as extension of either regular or
      * linked node.
+     *
+     * TreeNode<K,V>  extends  LinkedHashMap.Entry<K,V>  extends  HashMap.Node<K,V>
+     *     所以TreeNode含有所有父类的非私有字段
+     *     这里TreeNode还有个prev字段，用于构建双向链表
      */
     static final class TreeNode<K,V> extends LinkedHashMap.Entry<K,V> {
         TreeNode<K,V> parent;  // red-black tree links
@@ -2062,14 +2070,18 @@ public class HashMap<K,V> extends AbstractMap<K,V>
          */
         final void treeify(Node<K,V>[] tab) {
             TreeNode<K,V> root = null;
+            //从第一节点开始遍历TreeNode双向链表
             for (TreeNode<K,V> x = this, next; x != null; x = next) {
+                //保存next节点
                 next = (TreeNode<K,V>)x.next;
                 x.left = x.right = null;
+                //设置第一个节点为root节点
                 if (root == null) {
                     x.parent = null;
                     x.red = false;
                     root = x;
                 }
+                //开始构造红黑树
                 else {
                     K k = x.key;
                     int h = x.hash;
@@ -2077,10 +2089,14 @@ public class HashMap<K,V> extends AbstractMap<K,V>
                     for (TreeNode<K,V> p = root;;) {
                         int dir, ph;
                         K pk = p.key;
+                        //通过hash值，进行红黑树节点排序，记录到dir变量中
                         if ((ph = p.hash) > h)
                             dir = -1;
                         else if (ph < h)
                             dir = 1;
+                        //comparableClassFor(k)返回k对应的原型类的comparable比较逻辑，
+                            // 如果k的原型没有继承Comparable接口，则返回null
+                        //这个else if处理hash值相等的情况，通过其他方式进行比较，确定dir的值
                         else if ((kc == null &&
                                   (kc = comparableClassFor(k)) == null) ||
                                  (dir = compareComparables(kc, k, pk)) == 0)
@@ -2335,20 +2351,66 @@ public class HashMap<K,V> extends AbstractMap<K,V>
 
         /* ------------------------------------------------------------ */
         // Red-black tree methods, all adapted from CLR
-
+        /*
+             这里最多涉及4代节点，但是，一般情况，rl是不存在的，处理的一般是"小于号"的情况
+            如图：   pp
+                      /
+                    p
+                      \
+                         r
+            主要是进行p、r的位置左旋
+         */
         static <K,V> TreeNode<K,V> rotateLeft(TreeNode<K,V> root,
                                               TreeNode<K,V> p) {
             TreeNode<K,V> r, pp, rl;
+            //p节点存在，p的右节点r也存在，否则，直接返回原树
+            /*
+                    p                   r
+                      \      =>     /
+                         r         p
+             */
             if (p != null && (r = p.right) != null) {
+                //r节点存在左子节点rl，则把这个左子节点挂到p节点下
+                /*
+                    p                            r
+                      \                        /
+                         r        =>         p
+                       /                       \
+                    rl                           rl
+                 */
                 if ((rl = p.right = r.left) != null)
                     rl.parent = p;
+                //P的父节点不存在，直接把r节点设置为root节点，并变色
+                /*
+                    p                    r(black)
+                      \      =>     /
+                         r        p
+                 */
                 if ((pp = r.parent = p.parent) == null)
                     (root = r).red = false;
+                //p为pp的左节点
+                    /*
+                                 pp                 pp
+                               /                  /
+                            p         =>      r
+                              \             /
+                                 r        p
+                     */
                 else if (pp.left == p)
                     pp.left = r;
+                //p为pp的右节点
+                    /*
+                                pp        pp
+                               /              \
+                            p         =>        r
+                              \                /
+                                 r          p
+                     */
                 else
                     pp.right = r;
+                //p节点设置为r的左节点
                 r.left = p;
+                //r节点设置为p的父节点
                 p.parent = r;
             }
             return root;
@@ -2409,9 +2471,27 @@ public class HashMap<K,V> extends AbstractMap<K,V>
                     }
                     else {//叔叔节点不存在  或者  存在黑色叔叔节点
                         if (x == xp.right) {//x是右孩子，父节点为红色
+                            //进行左旋处理，处理"小于号"的情况，传入的是新增节点的父节点
+                            //这里主要进行了位置调整，没有做颜色变化
+                            //传入的节点和自己的子节点位置调整，其实，就是父子关系转变，大小关系已经确定
+                            /*
+                             如图：   pp                   pp
+                                        /                     /
+                                      p         =>         r
+                                        \                 /
+                                            r           p
+                             */
                             root = rotateLeft(root, x = xp);
+                            //重新给三个变量赋值
                             xpp = (xp = x.parent) == null ? null : xp.parent;
                         }
+                           /*
+                             如图：   pp(black)         pp(black)   pp(black)
+                                        /                     /               /                         r(black)
+                                      p         =>         r        =>    r(black)   =>         /       \
+                                        \                 /               /                         p(red)    pp(red)
+                                            r           p               p
+                             */
                         if (xp != null) {
                             xp.red = false;
                             if (xpp != null) {
