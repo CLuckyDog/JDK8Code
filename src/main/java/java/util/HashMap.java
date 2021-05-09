@@ -872,14 +872,16 @@ public class HashMap<K,V> extends AbstractMap<K,V>
 
                         do {
                             next = e.next;
-                            if ((e.hash & oldCap) == 0) {
+                            //这里直接和oldCap进行&操作，是为了把链表分成两队，高位和低位链表
+                            //我们知道，扩容后，对应位置上的元素只会出现在新table中的两个位置
+                            if ((e.hash & oldCap) == 0) {//低位链表
                                 if (loTail == null)
                                     loHead = e;
                                 else
                                     loTail.next = e;
                                 loTail = e;
                             }
-                            else {
+                            else {//高位链表
                                 if (hiTail == null)
                                     hiHead = e;
                                 else
@@ -887,12 +889,12 @@ public class HashMap<K,V> extends AbstractMap<K,V>
                                 hiTail = e;
                             }
                         } while ((e = next) != null);
-
+                        //低位链表放到新table的低位位置
                         if (loTail != null) {
                             loTail.next = null;
                             newTab[j] = loHead;
                         }
-
+                        //高位链表放到新table的高位位置
                         if (hiTail != null) {
                             hiTail.next = null;
                             newTab[j + oldCap] = hiHead;
@@ -965,23 +967,29 @@ public class HashMap<K,V> extends AbstractMap<K,V>
      * @param hash hash for key
      * @param key the key
      * @param value the value to match if matchValue, else ignored
-     * @param matchValue if true only remove if value is equal
-     * @param movable if false do not move other nodes while removing
+     * @param matchValue if true only remove if value is equal   默认FALSE
+     * @param movable if false do not move other nodes while removing   默认true
      * @return the node, or null if none
      */
     final Node<K,V> removeNode(int hash, Object key, Object value,
                                boolean matchValue, boolean movable) {
         Node<K,V>[] tab; Node<K,V> p; int n, index;
+        //首先判断tab不为空，长度大于零，对应桶位上的元素存在
         if ((tab = table) != null && (n = tab.length) > 0 &&
             (p = tab[index = (n - 1) & hash]) != null) {
             Node<K,V> node = null, e; K k; V v;
+            //通过key和对应的hash去找node是否存在
+            //当桶位上元素的就是要删除的node时，不用进行遍历
             if (p.hash == hash &&
                 ((k = p.key) == key || (key != null && key.equals(k))))
                 node = p;
             else if ((e = p.next) != null) {
+                //当是一个TreeNode类型的元素是，遍历树，找到要删除的node
                 if (p instanceof TreeNode)
+                    //通过树的根节点进行遍历树
                     node = ((TreeNode<K,V>)p).getTreeNode(hash, key);
                 else {
+                    //当是一个Node单向链表，do-while循环遍历链表，找出要删除的node
                     do {
                         if (e.hash == hash &&
                             ((k = e.key) == key ||
@@ -993,6 +1001,7 @@ public class HashMap<K,V> extends AbstractMap<K,V>
                     } while ((e = e.next) != null);
                 }
             }
+            //如果node找到了，则进行删除操作
             if (node != null && (!matchValue || (v = node.value) == value ||
                                  (value != null && value.equals(v)))) {
                 if (node instanceof TreeNode)
@@ -1991,10 +2000,13 @@ public class HashMap<K,V> extends AbstractMap<K,V>
             int n;
             if (root != null && tab != null && (n = tab.length) > 0) {
                 int index = (n - 1) & root.hash;
+                //此时，table中存放的还是Node链表，所以，要向下强转
                 TreeNode<K,V> first = (TreeNode<K,V>)tab[index];
                 if (root != first) {
                     Node<K,V> rn;
+                    //把树的根节点放到数组对应的下标位置上
                     tab[index] = root;
+                    //下面的几个if，就是把root节点从TreeNode双向链表中提取出来，并放到第一个位置，双向链表并没有破坏
                     TreeNode<K,V> rp = root.prev;
                     if ((rn = root.next) != null)
                         ((TreeNode<K,V>)rn).prev = rp;
@@ -2005,6 +2017,7 @@ public class HashMap<K,V> extends AbstractMap<K,V>
                     root.next = first;
                     root.prev = null;
                 }
+                //断言，检测红黑树是不是合格的
                 assert checkInvariants(root);
             }
         }
@@ -2103,18 +2116,21 @@ public class HashMap<K,V> extends AbstractMap<K,V>
                             dir = tieBreakOrder(k, pk);
 
                         TreeNode<K,V> xp = p;
+                        //把新处理的节点，插入树中适当的位置
                         if ((p = (dir <= 0) ? p.left : p.right) == null) {
                             x.parent = xp;
                             if (dir <= 0)
                                 xp.left = x;
                             else
                                 xp.right = x;
+                            //插入元素后，调整红黑树
                             root = balanceInsertion(root, x);
                             break;
                         }
                     }
                 }
             }
+            //把红黑树的root节点  绑定到Node[] table 数组中的指定位置。
             moveRootToFront(tab, root);
         }
 
@@ -2212,6 +2228,8 @@ public class HashMap<K,V> extends AbstractMap<K,V>
                 return;
             if (root.parent != null)
                 root = root.root();
+            //通过这几个条件判断，得知树的元素<=6，然后，进行树转链表
+            //减少一次链表遍历
             if (root == null
                 || (movable
                     && (root.right == null
@@ -2298,12 +2316,12 @@ public class HashMap<K,V> extends AbstractMap<K,V>
          * see above discussion about split bits and indices.
          *
          * @param map the map
-         * @param tab the table for recording bin heads
-         * @param index the index of the table being split
-         * @param bit the bit of hash to split on
+         * @param tab the table for recording bin heads  新的数组
+         * @param index the index of the table being split  遍历oldTab对应的数组下标
+         * @param bit the bit of hash to split on   oldCap，oldTab数组的长度
          */
         final void split(HashMap<K,V> map, Node<K,V>[] tab, int index, int bit) {
-            TreeNode<K,V> b = this;
+            TreeNode<K,V> b = this;//外面点用的节点e
             // Relink into lo and hi lists, preserving order
             TreeNode<K,V> loHead = null, loTail = null;
             TreeNode<K,V> hiHead = null, hiTail = null;
@@ -2311,6 +2329,7 @@ public class HashMap<K,V> extends AbstractMap<K,V>
             for (TreeNode<K,V> e = b, next; e != null; e = next) {
                 next = (TreeNode<K,V>)e.next;
                 e.next = null;
+                //低位元素，组成低位TreeNode双向链表
                 if ((e.hash & bit) == 0) {
                     if ((e.prev = loTail) == null)
                         loHead = e;
@@ -2319,6 +2338,7 @@ public class HashMap<K,V> extends AbstractMap<K,V>
                     loTail = e;
                     ++lc;
                 }
+                //高位元素，组成高位TreeNode双向链表
                 else {
                     if ((e.prev = hiTail) == null)
                         hiHead = e;
@@ -2330,10 +2350,15 @@ public class HashMap<K,V> extends AbstractMap<K,V>
             }
 
             if (loHead != null) {
+                //<=6就进行树转链表的降级操作
                 if (lc <= UNTREEIFY_THRESHOLD)
+                    //把TreeNode双向链表转换成Node单向链表
                     tab[index] = loHead.untreeify(map);
                 else {
+                    //把低位头元素绑定到数组对应的下标位置
                     tab[index] = loHead;
+                    //如果高位双向链表不为null，说明，拆分成两个双向链表了，此时要重新对低位双向链表树化
+                    //如果高位双向链表是null，说明，原来的树结构没有被拆分，则不需要重新树化
                     if (hiHead != null) // (else is already treeified)
                         loHead.treeify(tab);
                 }
