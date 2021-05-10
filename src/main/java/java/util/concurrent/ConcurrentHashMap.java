@@ -1014,22 +1014,30 @@ public class ConcurrentHashMap<K,V> extends AbstractMap<K,V>
         for (Node<K,V>[] tab = table;;) {
             Node<K,V> f; int n, i, fh;
             if (tab == null || (n = tab.length) == 0)
+                //CAS控制数组初始化
                 tab = initTable();
+            //UNSAFE获取数组在主存中的值，这样判断才是准确的
             else if ((f = tabAt(tab, i = (n - 1) & hash)) == null) {
+                //CAS给这个数组位置赋值一个新的Node
                 if (casTabAt(tab, i, null,
                              new Node<K,V>(hash, key, value, null)))
                     break;                   // no lock when adding to empty bin
             }
+            //MOVED = -1 说明当前hashmap正在进行扩容操作
             else if ((fh = f.hash) == MOVED)
                 tab = helpTransfer(tab, f);
             else {
                 V oldVal = null;
-                synchronized (f) {
+                synchronized (f) {//给头结点加锁
+                    //再次检查，如果加锁过程，另外一个线程修改了头结点，则什么都不操作
                     if (tabAt(tab, i) == f) {
+                        //链表类型
                         if (fh >= 0) {
                             binCount = 1;
+                            //遍历链表
                             for (Node<K,V> e = f;; ++binCount) {
                                 K ek;
+                                //找到相同的key就覆盖
                                 if (e.hash == hash &&
                                     ((ek = e.key) == key ||
                                      (ek != null && key.equals(ek)))) {
@@ -1038,6 +1046,7 @@ public class ConcurrentHashMap<K,V> extends AbstractMap<K,V>
                                         e.val = value;
                                     break;
                                 }
+                                //链表尾部插入新Node
                                 Node<K,V> pred = e;
                                 if ((e = e.next) == null) {
                                     pred.next = new Node<K,V>(hash, key,
@@ -1046,6 +1055,7 @@ public class ConcurrentHashMap<K,V> extends AbstractMap<K,V>
                                 }
                             }
                         }
+                        //红黑树类型
                         else if (f instanceof TreeBin) {
                             Node<K,V> p;
                             binCount = 2;
@@ -2223,6 +2233,7 @@ public class ConcurrentHashMap<K,V> extends AbstractMap<K,V>
     private final Node<K,V>[] initTable() {
         Node<K,V>[] tab; int sc;
         while ((tab = table) == null || tab.length == 0) {
+            //sizeCtl是实例变量，空参构造时初始化时为0，它用于初始化map的cap大小 this.sizeCtl = cap;
             if ((sc = sizeCtl) < 0)
                 Thread.yield(); // lost initialization race; just spin
             else if (U.compareAndSwapInt(this, SIZECTL, sc, -1)) {
@@ -2232,6 +2243,7 @@ public class ConcurrentHashMap<K,V> extends AbstractMap<K,V>
                         @SuppressWarnings("unchecked")
                         Node<K,V>[] nt = (Node<K,V>[])new Node<?,?>[n];
                         table = tab = nt;
+                        //等价于0.75n，扩容阈值
                         sc = n - (n >>> 2);
                     }
                 } finally {
@@ -2270,6 +2282,7 @@ public class ConcurrentHashMap<K,V> extends AbstractMap<K,V>
                 return;
             s = sumCount();
         }
+        //检查是否需要扩容
         if (check >= 0) {
             Node<K,V>[] tab, nt; int n, sc;
             while (s >= (long)(sc = sizeCtl) && (tab = table) != null &&
@@ -2528,6 +2541,7 @@ public class ConcurrentHashMap<K,V> extends AbstractMap<K,V>
             h = ThreadLocalRandom.getProbe();
             wasUncontended = true;
         }
+        //所有数组中的槽位都处于忙碌状态，并且线程修改值失败的时候，把它调整为true，下一次循环时，进行CounterCell[]扩容
         boolean collide = false;                // True if last slot nonempty
         for (;;) {
             CounterCell[] as; CounterCell a; int n; long v;
@@ -2562,11 +2576,17 @@ public class ConcurrentHashMap<K,V> extends AbstractMap<K,V>
                     break;
                 else if (counterCells != as || n >= NCPU)
                     collide = false;            // At max size or stale
+                //当两次循环之后，发现，线程依然没能把数值加入到CounterCell[]中，于是，程序认为竞争过于激烈
+                //于是改变collide的值为true，为后面CounterCell[]扩容使用
+                //从而缓解线程间的竞争，尽快把值加入到CounterCell[]中
+                //用扩大空间来提高效率
                 else if (!collide)
                     collide = true;
+                //对CounterCell[]进行扩容的if分支
                 else if (cellsBusy == 0 &&
                          U.compareAndSwapInt(this, CELLSBUSY, 0, 1)) {
                     try {
+                        //对CounterCell[]进行扩容,扩大2倍大小
                         if (counterCells == as) {// Expand table unless stale
                             CounterCell[] rs = new CounterCell[n << 1];
                             for (int i = 0; i < n; ++i)
@@ -2579,6 +2599,7 @@ public class ConcurrentHashMap<K,V> extends AbstractMap<K,V>
                     collide = false;
                     continue;                   // Retry with expanded table
                 }
+                //计算一个新的线程中h的值
                 h = ThreadLocalRandom.advanceProbe(h);
             }
             else if (cellsBusy == 0 && counterCells == as &&
@@ -2586,6 +2607,8 @@ public class ConcurrentHashMap<K,V> extends AbstractMap<K,V>
                 boolean init = false;
                 try {                           // Initialize table
                     if (counterCells == as) {
+                        //看出counterCells初始化的大小为2，new CounterCell[2]
+                        //最大为 n >= NCPU CPU核心数量
                         CounterCell[] rs = new CounterCell[2];
                         rs[h & 1] = new CounterCell(x);
                         counterCells = rs;
@@ -2614,9 +2637,10 @@ public class ConcurrentHashMap<K,V> extends AbstractMap<K,V>
             if ((n = tab.length) < MIN_TREEIFY_CAPACITY)
                 tryPresize(n << 1);
             else if ((b = tabAt(tab, index)) != null && b.hash >= 0) {
-                synchronized (b) {
-                    if (tabAt(tab, index) == b) {
+                synchronized (b) {//加锁
+                    if (tabAt(tab, index) == b) {//检查锁是否被修改
                         TreeNode<K,V> hd = null, tl = null;
+                        //把Node链表变换成TreeNode双向链表
                         for (Node<K,V> e = b; e != null; e = e.next) {
                             TreeNode<K,V> p =
                                 new TreeNode<K,V>(e.hash, e.key, e.val,
@@ -2627,6 +2651,8 @@ public class ConcurrentHashMap<K,V> extends AbstractMap<K,V>
                                 tl.next = p;
                             tl = p;
                         }
+                        //new TreeBin<K,V>(hd)把双向链表改成红黑树
+                        //再把红黑树封装到TreeBin对象中，并绑定到Node[]数组对应的位置上
                         setTabAt(tab, index, new TreeBin<K,V>(hd));
                     }
                 }
