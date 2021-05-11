@@ -2222,6 +2222,8 @@ public class ConcurrentHashMap<K,V> extends AbstractMap<K,V>
     /**
      * Returns the stamp bits for resizing a table of size n.
      * Must be negative when shifted left by RESIZE_STAMP_SHIFT.
+     * Integer.numberOfLeadingZeros(n)   方法返回32位二进制最高位1前面的0的个数
+     * 比如，16 0001 0000  返回  27  最高位1在第5位，32 - 5 = 27
      */
     static final int resizeStamp(int n) {
         return Integer.numberOfLeadingZeros(n) | (1 << (RESIZE_STAMP_BITS - 1));
@@ -2268,7 +2270,7 @@ public class ConcurrentHashMap<K,V> extends AbstractMap<K,V>
     private final void addCount(long x, int check) {
         CounterCell[] as; long b, s;
         if ((as = counterCells) != null ||
-            !U.compareAndSwapLong(this, BASECOUNT, b = baseCount, s = b + x)) {
+                !U.compareAndSwapLong(this, BASECOUNT, b = baseCount, s = b + x)) {
             CounterCell a; long v; int m;
             boolean uncontended = true;
             if (as == null || (m = as.length - 1) < 0 ||
@@ -2285,6 +2287,7 @@ public class ConcurrentHashMap<K,V> extends AbstractMap<K,V>
         //检查是否需要扩容
         if (check >= 0) {
             Node<K,V>[] tab, nt; int n, sc;
+            //判断元素个数是否大于扩容阈值 sizeCtl
             while (s >= (long)(sc = sizeCtl) && (tab = table) != null &&
                    (n = tab.length) < MAXIMUM_CAPACITY) {
                 int rs = resizeStamp(n);
