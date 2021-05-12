@@ -2288,6 +2288,7 @@ public class ConcurrentHashMap<K,V> extends AbstractMap<K,V>
         if (check >= 0) {
             Node<K,V>[] tab, nt; int n, sc;
             //判断元素个数是否大于扩容阈值 sizeCtl
+            //此处的while循环和helptransfer方法类似，helptransfer重复做了这里的 if (sc < 0) 分支操作
             while (s >= (long)(sc = sizeCtl) && (tab = table) != null &&
                    (n = tab.length) < MAXIMUM_CAPACITY) {
                 int rs = resizeStamp(n);
@@ -2379,6 +2380,8 @@ public class ConcurrentHashMap<K,V> extends AbstractMap<K,V>
     /**
      * Moves and/or copies the nodes in each bin to new table. See
      * above for explanation.
+     *
+     * nextTab  传入  null
      */
     private final void transfer(Node<K,V>[] tab, Node<K,V>[] nextTab) {
         int n = tab.length, stride;
@@ -2393,15 +2396,20 @@ public class ConcurrentHashMap<K,V> extends AbstractMap<K,V>
                 sizeCtl = Integer.MAX_VALUE;
                 return;
             }
+            //新数组
             nextTable = nextTab;
+            //旧数组长度
             transferIndex = n;
         }
         int nextn = nextTab.length;
+        //存放了扩容后的新数组
         ForwardingNode<K,V> fwd = new ForwardingNode<K,V>(nextTab);
         boolean advance = true;
         boolean finishing = false; // to ensure sweep before committing nextTab
+        /*---------------------------------------------------------------------------------*/
         for (int i = 0, bound = 0;;) {
             Node<K,V> f; int fh;
+            /*---------------------------------------------------------------------------------*/
             while (advance) {
                 int nextIndex, nextBound;
                 if (--i >= bound || finishing)
@@ -2410,6 +2418,7 @@ public class ConcurrentHashMap<K,V> extends AbstractMap<K,V>
                     i = -1;
                     advance = false;
                 }
+                //从这里可以看出，是从数组尾部向头部进行步长为stride处理的
                 else if (U.compareAndSwapInt
                          (this, TRANSFERINDEX, nextIndex,
                           nextBound = (nextIndex > stride ?
@@ -2419,6 +2428,8 @@ public class ConcurrentHashMap<K,V> extends AbstractMap<K,V>
                     advance = false;
                 }
             }
+            /*---------------------------------------------------------------------------------*/
+            //nextn新数组长度
             if (i < 0 || i >= n || i + n >= nextn) {
                 int sc;
                 if (finishing) {
@@ -2434,6 +2445,7 @@ public class ConcurrentHashMap<K,V> extends AbstractMap<K,V>
                     i = n; // recheck before commit
                 }
             }
+            /*---------------------------------------------------------------------------------*/
             else if ((f = tabAt(tab, i)) == null)
                 advance = casTabAt(tab, i, null, fwd);
             else if ((fh = f.hash) == MOVED)
@@ -2442,6 +2454,7 @@ public class ConcurrentHashMap<K,V> extends AbstractMap<K,V>
                 synchronized (f) {
                     if (tabAt(tab, i) == f) {
                         Node<K,V> ln, hn;
+                        /*---------------------------------------------------------------------------------*/
                         if (fh >= 0) {
                             int runBit = fh & n;
                             Node<K,V> lastRun = f;
@@ -2472,6 +2485,7 @@ public class ConcurrentHashMap<K,V> extends AbstractMap<K,V>
                             setTabAt(tab, i, fwd);
                             advance = true;
                         }
+                        /*---------------------------------------------------------------------------------*/
                         else if (f instanceof TreeBin) {
                             TreeBin<K,V> t = (TreeBin<K,V>)f;
                             TreeNode<K,V> lo = null, loTail = null;
