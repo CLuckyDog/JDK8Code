@@ -2410,6 +2410,7 @@ public class ConcurrentHashMap<K,V> extends AbstractMap<K,V>
         for (int i = 0, bound = 0;;) {
             Node<K,V> f; int fh;
             /*---------------------------------------------------------------------------------*/
+            //这个while主要是用来计算i、bound的值
             while (advance) {
                 int nextIndex, nextBound;
                 if (--i >= bound || finishing)
