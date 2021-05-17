@@ -2435,6 +2435,7 @@ public class ConcurrentHashMap<K,V> extends AbstractMap<K,V>
                 int sc;
                 if (finishing) {
                     nextTable = null;
+                    //把元素都移到新数组后，这里把新数组赋值给table变量，这样，后面的线程就拿到扩容后的数组了
                     table = nextTab;
                     sizeCtl = (n << 1) - (n >>> 1);
                     return;

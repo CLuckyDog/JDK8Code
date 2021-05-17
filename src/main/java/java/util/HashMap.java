@@ -283,7 +283,7 @@ public class HashMap<K,V> extends AbstractMap<K,V>
      * between resizing and treeification thresholds.
      *
      * 最小的树化元素个数，和 TREEIFY_THRESHOLD 共同决定树化的参数
-     * 当哈希表中的所有元素个数超过64时，才会允许树化
+     * 当哈希表中数组长度超过64时，才会允许树化
      */
     static final int MIN_TREEIFY_CAPACITY = 64;
 
